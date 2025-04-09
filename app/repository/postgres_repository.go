@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 
 	"github.com/JOSHUAJEBARAJ/sre-bootcamp/models"
@@ -23,27 +24,41 @@ func NewStudentRepositoryPostgres(ctx context.Context, dbConfig models.DatabaseC
 		"password=%s dbname=%s sslmode=disable", dbConfig.Host, dbConfig.Port, dbConfig.UserName, dbConfig.Password, dbConfig.DbName)
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
-		log.WithError(err).Error("Error while opening the connection")
-		return &StudentRepositoryPostgres{}, err
+		log.WithError(err).Error("Failed to open connection")
+		return nil, err
 	}
-	err = db.Ping()
+	err = db.PingContext(ctx)
 	if err != nil {
 		log.WithFields(log.Fields{
 			"host": dbConfig.Host,
 			"db":   dbConfig.DbName,
-		}).WithError(err).Error("Error connecting to the database")
-		return &StudentRepositoryPostgres{}, err
+		}).WithError(err).Error("Failed to ping to the database")
+		return nil, err
 	}
 	return &StudentRepositoryPostgres{db}, nil
 }
 
-func (s *StudentRepositoryPostgres) AddStudent(input models.StudentInput) (models.Student, error) {
+func (r *StudentRepositoryPostgres) PingDB(ctx context.Context) error {
+	if r.client == nil {
+		return errors.New("database client is not initialized")
+	}
+	return r.client.PingContext(ctx)
+}
+
+func (s *StudentRepositoryPostgres) AddStudent(ctx context.Context, input models.StudentInput) (models.Student, error) {
 	var id int
-	err := s.client.QueryRow("INSERT INTO students(name,age,degree) VALUES($1,$2,$3) RETURNING id", input.Name, input.Age, input.Degree).Scan(&id)
+	logger := log.WithFields(log.Fields{
+		"name":   input.Name,
+		"age":    input.Age,
+		"degree": input.Degree,
+	})
+	logger.Info("Attempting to add new student to database")
+	err := s.client.QueryRowContext(ctx, "INSERT INTO students(name,age,degree) VALUES($1,$2,$3) RETURNING id", input.Name, input.Age, input.Degree).Scan(&id)
 	if err != nil {
-		log.WithError(err).Error("Error while adding student")
+		logger.WithError(err).Error("Failed to add Students")
 		return models.Student{}, err
 	}
+	logger.WithField("student_id", id).Info("Successfully added student to database")
 	return models.Student{
 		Id:     id,
 		Name:   input.Name,
@@ -53,28 +68,33 @@ func (s *StudentRepositoryPostgres) AddStudent(input models.StudentInput) (model
 
 }
 
-func (s *StudentRepositoryPostgres) GetStudent(id int) (models.Student, error) {
+func (s *StudentRepositoryPostgres) GetStudent(ctx context.Context, id int) (models.Student, error) {
 	var student models.Student
-	err := s.client.QueryRow("select id, name, age, degree  from students where id=$1", id).Scan(
+	err := s.client.QueryRowContext(ctx, "select id, name, age, degree  from students where id=$1", id).Scan(
 		&student.Id, &student.Name, &student.Age, &student.Degree)
-
+	logger := log.WithFields(log.Fields{
+		"student_id": id,
+	})
+	logger.Info("Attempting to get the Student")
 	if err != nil {
 		if err == sql.ErrNoRows {
 			// No student found with the given ID
-			log.WithField("id", id).Warn("Student not found in DB")
+			logger.Warn("Student not found in DB")
 			return models.Student{}, sql.ErrNoRows
 		}
-		log.WithError(err).Error("Error while getting individual student")
+		log.WithError(err).Error("Failed to get student")
 		return models.Student{}, err
 	}
 
+	logger.Info("Successfully found the student")
 	return student, nil
 }
 
-func (s *StudentRepositoryPostgres) GetAllStudent() ([]models.Student, error) {
-	rows, err := s.client.Query("select id, name, age, degree  from students")
+func (s *StudentRepositoryPostgres) GetAllStudent(ctx context.Context) ([]models.Student, error) {
+	rows, err := s.client.QueryContext(ctx, "select id, name, age, degree  from students")
+	log.Info("Fetching all students from database")
 	if err != nil {
-		log.WithError(err).Error("Error while getting all student")
+		log.WithError(err).Error("Failed to get all students")
 		return []models.Student{}, err
 	}
 	defer rows.Close()
@@ -83,23 +103,32 @@ func (s *StudentRepositoryPostgres) GetAllStudent() ([]models.Student, error) {
 		var student models.Student
 		err := rows.Scan(&student.Id, &student.Name, &student.Age, &student.Degree)
 		if err != nil {
-			log.WithError(err).Error("Error while getting all student")
+			log.WithError(err).Error("Failed to scan student row")
 			return []models.Student{}, err
 		}
 		students = append(students, student)
 	}
 	if err := rows.Err(); err != nil {
-		log.WithError(err).Error("Error while getting all student")
+		log.WithError(err).Error("Error encountered after scanning all rows")
 		return []models.Student{}, err
 	}
+	log.Info("Successfully retrieved all students")
 	return students, nil
 }
 
-func (s *StudentRepositoryPostgres) UpdateStudent(id int, input models.StudentInput) (models.Student, error) {
+func (s *StudentRepositoryPostgres) UpdateStudent(ctx context.Context, id int, input models.StudentInput) (models.Student, error) {
 
 	var updatedStudent models.Student
+
+	logger := log.WithFields(log.Fields{
+		"studnet_id": id,
+		"name":       input.Name,
+		"age":        input.Age,
+		"degree":     input.Degree,
+	})
+
 	// var id int
-	err := s.client.QueryRow(`
+	err := s.client.QueryRowContext(ctx, `
 	UPDATE students
 	set name =$1,age=$2,degree = $3
 	where id = $4
@@ -107,33 +136,36 @@ func (s *StudentRepositoryPostgres) UpdateStudent(id int, input models.StudentIn
 	`, input.Name, input.Age, input.Degree, id).Scan(&updatedStudent.Id, &updatedStudent.Name, &updatedStudent.Age, &updatedStudent.Degree)
 	if err != nil {
 		if err == sql.ErrNoRows {
-			log.WithField("id", id).Warn("Student not found in DB")
+			logger.Warn("Student not found in DB")
 			return models.Student{}, sql.ErrNoRows
 		}
-		log.WithError(err).Error("Error while updating")
+		logger.WithError(err).Error("Failed to update student")
 		return models.Student{}, err
 	}
 	return updatedStudent, nil
 
 }
 
-func (s *StudentRepositoryPostgres) DeleteStudent(id int) error {
-
+func (s *StudentRepositoryPostgres) DeleteStudent(ctx context.Context, id int) error {
+	logger := log.WithFields(log.Fields{
+		"student_id": id,
+	})
 	// var id int
-	result, err := s.client.Exec(`
+	logger.Info("Attempting to delete student")
+	result, err := s.client.ExecContext(ctx, `
 DELETE FROM students where id=$1
 	`, id)
 	if err != nil {
-		log.WithError(err).Error("Error while deleting students")
+		logger.WithError(err).Error("Failed to execute delete query")
 		return err
 	}
 	rowAffected, err := result.RowsAffected()
 	if err != nil {
-		log.WithError(err).Error("Error while deleting students")
+		logger.WithError(err).Error("Failed to get affected rows after deletion")
 		return err
 	}
 	if rowAffected == 0 {
-		log.WithField("id", id).Warn("Student not found in DB")
+		logger.Warn("Student not found in database")
 		return sql.ErrNoRows
 	}
 	return nil

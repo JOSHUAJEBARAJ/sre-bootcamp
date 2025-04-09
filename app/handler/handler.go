@@ -20,12 +20,13 @@ func NewStudentHandler(s *service.StudentService) *StudentHandler {
 }
 func (h *StudentHandler) AddStudent(c *gin.Context) {
 	var newStudent models.StudentInput
+	ctx := c.Request.Context()
 	if err := c.BindJSON(&newStudent); err != nil {
 		log.WithError(err).Error("Error while Converting the data")
 		c.IndentedJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	outputStudent, err := h.srv.AddStudent(newStudent)
+	outputStudent, err := h.srv.AddStudent(ctx, newStudent)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to create student"})
 		return
@@ -34,10 +35,28 @@ func (h *StudentHandler) AddStudent(c *gin.Context) {
 
 }
 
+func (h *StudentHandler) Healthcheck(c *gin.Context) {
+	ctx := c.Request.Context()
+	err := h.srv.PingDB(ctx)
+	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":  "error",
+			"message": "Database connection failed",
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"status": "ok",
+		"dependencies": gin.H{
+			"database": "connected",
+		},
+	})
+}
+
 func (h *StudentHandler) GetAllStudent(c *gin.Context) {
 	// var students []models.StudentInput
-
-	students, err := h.srv.GetAllStudent()
+	ctx := c.Request.Context()
+	students, err := h.srv.GetAllStudent(ctx)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch student"})
 		return
@@ -48,13 +67,14 @@ func (h *StudentHandler) GetAllStudent(c *gin.Context) {
 
 func (h *StudentHandler) GetStudent(c *gin.Context) {
 	// var students []models.StudentInput
+	ctx := c.Request.Context()
 	id := c.Param("id")
 	idInt, err := strconv.ParseInt(id, 0, 0)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse student ID from path"})
 		return
 	}
-	student, err := h.srv.GetStudent(int(idInt))
+	student, err := h.srv.GetStudent(ctx, int(idInt))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.IndentedJSON(http.StatusNotFound, gin.H{"error": "Student not found"})
@@ -71,12 +91,13 @@ func (h *StudentHandler) GetStudent(c *gin.Context) {
 func (h *StudentHandler) DeleteStudent(c *gin.Context) {
 	// var students []models.StudentInput
 	id := c.Param("id")
+	ctx := c.Request.Context()
 	idInt, err := strconv.ParseInt(id, 0, 0)
 	if err != nil {
 		c.IndentedJSON(http.StatusInternalServerError, gin.H{"error": "Failed to parse student ID from path"})
 		return
 	}
-	err = h.srv.DeleteStudent(int(idInt))
+	err = h.srv.DeleteStudent(ctx, int(idInt))
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.IndentedJSON(http.StatusNotFound, gin.H{"error": "Student not found"})
@@ -103,7 +124,8 @@ func (h *StudentHandler) PutStudent(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	updateStudent, err := h.srv.UpdateStudent(int(idInt), s)
+	ctx := c.Request.Context()
+	updateStudent, err := h.srv.UpdateStudent(ctx, int(idInt), s)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			c.IndentedJSON(http.StatusNotFound, gin.H{"error": "Student not found"})

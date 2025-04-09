@@ -73,11 +73,12 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 	router := gin.Default()
-	router.GET("/students", handler.GetAllStudent)
-	router.GET("/students/:id", handler.GetStudent)
-	router.DELETE("/students/:id", handler.DeleteStudent)
-	router.PUT("/students/:id", handler.PutStudent)
-	router.POST("/students", handler.AddStudent)
+	router.GET("/api/v1/students", handler.GetAllStudent)
+	router.GET("/api/v1/students/:id", handler.GetStudent)
+	router.DELETE("/api/v1/students/:id", handler.DeleteStudent)
+	router.PUT("/api/v1/students/:id", handler.PutStudent)
+	router.POST("/api/v1/students", handler.AddStudent)
+	router.GET("/healthcheck", handler.Healthcheck)
 	port := os.Getenv("SERVER_PORT")
 
 	if port == "" {

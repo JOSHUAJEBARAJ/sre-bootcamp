@@ -1,17 +1,22 @@
 package repository
 
-import "github.com/JOSHUAJEBARAJ/sre-bootcamp/models"
+import (
+	"context"
+
+	"github.com/JOSHUAJEBARAJ/sre-bootcamp/models"
+)
 
 type StudentRepository interface {
-
 	// add
-	AddStudent(input models.StudentInput) (models.Student, error)
+	AddStudent(ctx context.Context, input models.StudentInput) (models.Student, error)
 	// get
-	GetStudent(id int) (models.Student, error)
+	GetStudent(ctx context.Context, id int) (models.Student, error)
 	// getAll
-	GetAllStudent() ([]models.Student, error)
+	GetAllStudent(ctx context.Context) ([]models.Student, error)
 	//update
-	UpdateStudent(id int, input models.StudentInput) (models.Student, error)
+	UpdateStudent(ctx context.Context, id int, input models.StudentInput) (models.Student, error)
 	// delete
-	DeleteStudent(id int) error
+	DeleteStudent(ctx context.Context, id int) error
+	// TODO : Move this to the seperate interface
+	PingDB(ctx context.Context) error
 }

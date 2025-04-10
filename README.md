@@ -74,3 +74,7 @@ make docker-stop
 ```bash
 make remove-db-data
 ```
+
+### Docker-compose 
+
+```bash 

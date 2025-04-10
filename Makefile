@@ -73,14 +73,24 @@ docker-app-build:
 	cd app && \
 	docker build -t student_api:$(IMAGE_TAG) .
 
-.PHONE:docker-app-run
+.PHONY:docker-app-run
 docker-app-run:
 	@CONTAINER_HOST=$$(docker inspect postgres | jq -r '.[0].NetworkSettings.IPAddress'); \
 	docker run  -d --rm --name app -p 8080:8080 -e DB_USERNAME=$(DB_USERNAME) -e DB_PASSWORD=$(DB_PASSWORD) -e DB_HOST=$$CONTAINER_HOST -e DB_PORT=$(DB_PORT) -e DB_DBNAME=$(DB_DBNAME) -e ENV=$(ENV) student_api:$(IMAGE_TAG)
 
-.PHONE:docker-app-stop 
+.PHONY:docker-app-stop 
 docker-app-stop:
 	docker stop app 
 
-.PHONE:docker-stop 
+.PHONY:docker-stop 
 docker-stop: docker-app-stop stop-db
+
+.PHONY:docker-compose-app-start 
+docker-compose-app-start:
+	docker-compose up -d db
+	make db-migrate
+	docker-compose up -d web 
+
+.PHONY:docker-compose-app-stop 
+docker-compose-app-stop:
+	docker-compose down

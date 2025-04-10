@@ -17,7 +17,6 @@ WORKDIR /app
     
 COPY --from=build /app/server .
 
-
 EXPOSE 8080
 
 CMD ["./server"]

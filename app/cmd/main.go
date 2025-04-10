@@ -89,7 +89,7 @@ func main() {
 	router.POST("/api/v1/students", handler.AddStudent)
 	router.GET("/healthcheck", handler.Healthcheck)
 
-	addr := "localhost:8080"
+	addr := ":8080"
 	server := &http.Server{
 		Addr:    addr,
 		Handler: router,

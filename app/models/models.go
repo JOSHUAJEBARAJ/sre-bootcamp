@@ -3,7 +3,7 @@ package models
 // model for storing the Student
 
 type Student struct {
-	Id     int
+	ID     int
 	Name   string
 	Age    int
 	Degree string
@@ -25,5 +25,5 @@ type DatabaseConfig struct {
 	Port     int
 	UserName string
 	Password string
-	DbName   string
+	DBName   string
 }

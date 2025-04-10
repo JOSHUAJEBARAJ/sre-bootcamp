@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/JOSHUAJEBARAJ/sre-bootcamp/handler"
@@ -46,23 +49,28 @@ func populateDBConfig() models.DatabaseConfig {
 		Password: password,
 		Host:     host,
 		Port:     int(intPort),
-		DbName:   dbName,
+		DBName:   dbName,
 	}
 }
+
+func init() {
+	log.SetFormatter(&log.JSONFormatter{})
+	log.SetLevel(log.InfoLevel)
+	if err := godotenv.Load(); err != nil {
+		log.Warnf("Failed to load .env file: %v. Falling back to shell environment variables.", err)
+	}
+}
+
 func main() {
 	//
 
-	log.SetFormatter(&log.JSONFormatter{})
-	log.SetLevel(log.InfoLevel)
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	err := godotenv.Load()
+	db, err := repository.NewDB(ctx, populateDBConfig())
 	if err != nil {
-		log.Fatal("Error Loading .env file")
+		log.Fatal(err)
 	}
-	db := populateDBConfig()
-	repo, err := repository.NewStudentRepositoryPostgres(ctx, db)
+	repo, err := repository.NewStudentRepositoryPostgres(db)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -84,10 +92,33 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
-	log.Infof("Server running on localhost:%s", port)
-	err = router.Run("localhost:" + port)
-	if err != nil {
-		log.Fatal("Error while Creating the server", err)
+	addr := "localhost:" + port
+	server := &http.Server{
+		Addr:    addr,
+		Handler: router,
+	}
+
+	go func() {
+		log.Infof("Server running on localhost:%s", port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("Server failed: %v", err)
+		}
+	}()
+	defer func() {
+		db.Close()
+	}()
+
+	// handle shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Errorf("Server shutdown failed: %v", err)
+	} else {
+		log.Info("Server gracefully stopped")
 	}
 
 }

@@ -3,8 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"errors"
-	"fmt"
 
 	"github.com/JOSHUAJEBARAJ/sre-bootcamp/models"
 	log "github.com/sirupsen/logrus"
@@ -17,31 +15,34 @@ type StudentRepositoryPostgres struct {
 	client *sql.DB
 }
 
-func NewStudentRepositoryPostgres(ctx context.Context, dbConfig models.DatabaseConfig) (*StudentRepositoryPostgres, error) {
+func NewStudentRepositoryPostgres(db *DB) (*StudentRepositoryPostgres, error) {
 	// todo implemenet this latter
 
-	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
-		"password=%s dbname=%s sslmode=disable", dbConfig.Host, dbConfig.Port, dbConfig.UserName, dbConfig.Password, dbConfig.DbName)
-	db, err := sql.Open("postgres", psqlInfo)
-	if err != nil {
-		log.WithError(err).Error("Failed to open connection")
-		return nil, err
-	}
-	err = db.PingContext(ctx)
-	if err != nil {
-		log.WithFields(log.Fields{
-			"host": dbConfig.Host,
-			"db":   dbConfig.DbName,
-		}).WithError(err).Error("Failed to ping to the database")
-		return nil, err
-	}
-	return &StudentRepositoryPostgres{db}, nil
+	// psqlInfo := fmt.Sprintf("host=%s port=%d user=%s "+
+	// 	"password=%s dbname=%s sslmode=disable", dbConfig.Host, dbConfig.Port, dbConfig.UserName, dbConfig.Password, dbConfig.DbName)
+	// db, err := sql.Open("postgres", psqlInfo)
+	// if err != nil {
+	// 	log.WithError(err).Error("Failed to open connection")
+	// 	return nil, err
+	// }
+	// db.SetMaxOpenConns(MAX_OPEN_CONNECTIONS)
+	// db.SetMaxIdleConns(MAX_IDLE_CONNECTIONS)
+	// db.SetConnMaxLifetime(time.Minute * MAX_CONNECTION_LIFETIME)
+	// err = db.PingContext(ctx)
+	// if err != nil {
+	// 	log.WithFields(log.Fields{
+	// 		"host": dbConfig.Host,
+	// 		"db":   dbConfig.DbName,
+	// 	}).WithError(err).Error("Failed to ping to the database")
+	// 	return nil, err
+	// }
+	return &StudentRepositoryPostgres{db.client}, nil
 }
 
 func (r *StudentRepositoryPostgres) PingDB(ctx context.Context) error {
-	if r.client == nil {
-		return errors.New("database client is not initialized")
-	}
+	// if r.client == nil {
+	// 	return errors.New("database client is not initialized")
+	// }
 	return r.client.PingContext(ctx)
 }
 
@@ -60,7 +61,7 @@ func (s *StudentRepositoryPostgres) AddStudent(ctx context.Context, input models
 	}
 	logger.WithField("student_id", id).Info("Successfully added student to database")
 	return models.Student{
-		Id:     id,
+		ID:     id,
 		Name:   input.Name,
 		Age:    input.Age,
 		Degree: input.Degree,
@@ -71,7 +72,7 @@ func (s *StudentRepositoryPostgres) AddStudent(ctx context.Context, input models
 func (s *StudentRepositoryPostgres) GetStudent(ctx context.Context, id int) (models.Student, error) {
 	var student models.Student
 	err := s.client.QueryRowContext(ctx, "select id, name, age, degree  from students where id=$1", id).Scan(
-		&student.Id, &student.Name, &student.Age, &student.Degree)
+		&student.ID, &student.Name, &student.Age, &student.Degree)
 	logger := log.WithFields(log.Fields{
 		"student_id": id,
 	})
@@ -101,7 +102,7 @@ func (s *StudentRepositoryPostgres) GetAllStudent(ctx context.Context) ([]models
 	var students []models.Student
 	for rows.Next() {
 		var student models.Student
-		err := rows.Scan(&student.Id, &student.Name, &student.Age, &student.Degree)
+		err := rows.Scan(&student.ID, &student.Name, &student.Age, &student.Degree)
 		if err != nil {
 			log.WithError(err).Error("Failed to scan student row")
 			return []models.Student{}, err
@@ -133,7 +134,7 @@ func (s *StudentRepositoryPostgres) UpdateStudent(ctx context.Context, id int, i
 	set name =$1,age=$2,degree = $3
 	where id = $4
 	RETURNING id,name,age,degree
-	`, input.Name, input.Age, input.Degree, id).Scan(&updatedStudent.Id, &updatedStudent.Name, &updatedStudent.Age, &updatedStudent.Degree)
+	`, input.Name, input.Age, input.Degree, id).Scan(&updatedStudent.ID, &updatedStudent.Name, &updatedStudent.Age, &updatedStudent.Degree)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			logger.Warn("Student not found in DB")

@@ -26,4 +26,4 @@ The repository should contain the following
 
 - [x] API should have a /healthcheck endpoint.
 
-- [ ] Unit tests for different endpoints.
+- [x] Unit tests for different endpoints.

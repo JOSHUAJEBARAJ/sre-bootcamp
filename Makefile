@@ -8,14 +8,11 @@ help:
 	@echo 'Usage:'
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
 
-## clean: clean the app
-.PHONY: clean 
-clean:
-	go clean
 ## tidy: tidy modfiles and format .go files
 .PHONY: tidy
 tidy:
-	go mod tidy -v
+	cd app && \
+	go mod tidy -v && \
 	go fmt ./...
 
 ## run: run the  application
@@ -26,6 +23,7 @@ run: build
 ## test: run all tests
 .PHONY: test
 test:
+	cd app && \
 	go test -v -race -buildvcs ./...
 
 ## audit: run quality control checks
@@ -33,6 +31,7 @@ test:
 
 .PHONY: dev
 dev:
+	cd app && \
 	go run github.com/cosmtrek/air@v1.43.0 \
 		--build.cmd "make build" --build.bin "/tmp/bin/${binary_name}" --build.delay "100" \
 		--build.exclude_dir "" \
@@ -43,8 +42,8 @@ dev:
 ## Install: install the dependency
 .PHONY: install 
 install:
+	cd app && \
 	go mod tidy
-	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
 .PHONY: start-db
 start-db:
@@ -60,7 +59,7 @@ remove-db:
 .PHONY: build
 ## build: build the application
 build: install
-    # Include additional build steps, like TypeScript, SCSS or Tailwind compilation here...
+	cd app && \
 	go build -o=/tmp/bin/${binary_name} ${main_package_path}
 
 .PHONY: db-migrate

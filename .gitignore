@@ -8,8 +8,7 @@
 *.so
 *.dylib
 .env
-app/docker-compose.yaml
-app/data
+data
 # Test binary, built with `go test -c`
 *.test
 

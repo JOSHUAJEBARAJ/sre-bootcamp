@@ -56,8 +56,9 @@ func populateDBConfig() models.DatabaseConfig {
 func init() {
 	log.SetFormatter(&log.JSONFormatter{})
 	log.SetLevel(log.InfoLevel)
-	if err := godotenv.Load(); err != nil {
-		log.Warnf("Failed to load .env file: %v. Falling back to shell environment variables.", err)
+	// TODO figure out way to remove the hardcoded values
+	if err := godotenv.Load("/Users/joshua/Projects/sre-bootcamp/.env"); err != nil {
+		log.Warnf("Failed to load ..env file: %v. Falling back to shell environment variables.", err)
 	}
 }
 

@@ -33,7 +33,7 @@ test:
 dev:
 	cd app && \
 	go run github.com/cosmtrek/air@v1.43.0 \
-		--build.cmd "make build" --build.bin "/tmp/bin/${binary_name}" --build.delay "100" \
+		--build.cmd "go build -o=/tmp/bin/${binary_name} ${main_package_path}" --build.bin "/tmp/bin/${binary_name}" --build.delay "100" \
 		--build.exclude_dir "" \
 		--build.include_ext "go, tpl, tmpl, html, css, scss, js, ts, sql, jpeg, jpg, gif, png, bmp, svg, webp, ico" \
 		--misc.clean_on_exit "true"
@@ -52,8 +52,8 @@ start-db:
 stop-db: 
 	docker stop postgres
 
-.PHONY: remove-db
-remove-db: 
+.PHONY: remove-db-data
+remove-db-data: 
 	rm -rf data
 
 .PHONY: build
@@ -66,3 +66,21 @@ build: install
 db-migrate:
 	go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest && \
 	migrate -path db/migrations -database "postgres://$(DB_USERNAME):$(DB_PASSWORD)@localhost:5432/$(DB_DBNAME)?sslmode=disable" up
+
+
+.PHONY: docker-app-build
+docker-app-build:
+	cd app && \
+	docker build -t student_api:$(IMAGE_TAG) .
+
+.PHONE:docker-app-run
+docker-app-run:
+	@CONTAINER_HOST=$$(docker inspect postgres | jq -r '.[0].NetworkSettings.IPAddress'); \
+	docker run  -d --rm --name app -p 8080:8080 -e DB_USERNAME=$(DB_USERNAME) -e DB_PASSWORD=$(DB_PASSWORD) -e DB_HOST=$$CONTAINER_HOST -e DB_PORT=$(DB_PORT) -e DB_DBNAME=$(DB_DBNAME) -e ENV=$(ENV) student_api:$(IMAGE_TAG)
+
+.PHONE:docker-app-stop 
+docker-app-stop:
+	docker stop app 
+
+.PHONE:docker-stop 
+docker-stop: docker-app-stop stop-db

@@ -58,7 +58,7 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 	// TODO figure out way to remove the hardcoded values
 	if err := godotenv.Load("/Users/joshua/Projects/sre-bootcamp/.env"); err != nil {
-		log.Warnf("Failed to load ..env file: %v. Falling back to shell environment variables.", err)
+		// DO NOTHING
 	}
 }
 
@@ -88,19 +88,15 @@ func main() {
 	router.PUT("/api/v1/students/:id", handler.PutStudent)
 	router.POST("/api/v1/students", handler.AddStudent)
 	router.GET("/healthcheck", handler.Healthcheck)
-	port := os.Getenv("SERVER_PORT")
 
-	if port == "" {
-		port = "8080"
-	}
-	addr := "localhost:" + port
+	addr := "localhost:8080"
 	server := &http.Server{
 		Addr:    addr,
 		Handler: router,
 	}
 
 	go func() {
-		log.Infof("Server running on localhost:%s", port)
+		log.Infof("Server running on localhost:8080")
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed: %v", err)
 		}

@@ -58,7 +58,7 @@ func init() {
 	log.SetLevel(log.InfoLevel)
 	// TODO figure out way to remove the hardcoded values
 	if err := godotenv.Load("/Users/joshua/Projects/sre-bootcamp/.env"); err != nil {
-		// DO NOTHING
+		// DO NOTHINGS
 	}
 }
 

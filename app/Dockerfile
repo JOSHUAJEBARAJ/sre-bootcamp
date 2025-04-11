@@ -3,7 +3,6 @@ FROM golang:1-alpine AS build
 WORKDIR /app
 
 COPY . .
-# RUN ls
 RUN --mount=type=cache,target=app/go/pkg/mod \
     go mod download
 

@@ -2,7 +2,7 @@
 main_package_path = ./cmd/main.go
 binary_name = server
 .PHONY: help
-include .env
+-include .env
 ## help: print this help message
 help:
 	@echo 'Usage:'

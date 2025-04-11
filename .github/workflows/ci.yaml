@@ -1,6 +1,10 @@
 name: Go
-on: [push]
-
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - app/**
 jobs:
   build:
     runs-on: ubuntu-latest

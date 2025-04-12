@@ -1,0 +1,140 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: migration-scripts
+  namespace: student-api-ns
+data:
+  000001_create_users_table.up.sql: |
+    CREATE TABLE IF NOT EXISTS students (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        age INTEGER NOT NULL,
+        degree TEXT NOT NULL
+    );
+  000001_create_users_table.down.sql: |
+    DROP TABLE students;
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: application-sa
+  namespace: student-api-ns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: db-config-secrets-access
+  namespace: student-api-ns
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["db-secrets"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["postgres-config"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: application-sa-binding
+  namespace: student-api-ns
+subjects:
+  - kind: ServiceAccount
+    name: application-sa
+    namespace: student-api-ns
+roleRef:
+  kind: Role
+  name: db-config-secrets-access
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: student-api
+  namespace: student-api-ns
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: student-api
+  template:
+    metadata:
+      labels:
+        app: student-api
+    spec:
+      serviceAccountName: application-sa
+      initContainers:
+        - name: db-migration
+          image: migrate/migrate:latest
+          env:
+            - name: DB_DBNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: DB_DBNAME
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: DB_PASSWORD
+          command:
+            - migrate
+            - -path
+            - /migrations
+            - -database
+            - postgres://$(DB_USERNAME):$(DB_PASSWORD)@postgres:5432/$(DB_DBNAME)?sslmode=disable
+            - up
+          volumeMounts:
+            - name: migration-scripts
+              mountPath: /migrations
+      containers:
+        - name: student-api
+          image: joshuajebaraj/rest-api:a44509e
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_DBNAME
+              valueFrom:
+                configMapKeyRef:
+                  name: postgres-config
+                  key: DB_DBNAME
+            - name: DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: DB_USERNAME
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: DB_PASSWORD
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_HOST
+              value: postgres
+      volumes:
+        - name: migration-scripts
+          configMap:
+            name: migration-scripts
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: student-api
+  namespace: student-api-ns
+spec:
+  selector:
+    app: student-api
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+  type: ClusterIP

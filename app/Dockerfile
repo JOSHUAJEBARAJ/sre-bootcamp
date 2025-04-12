@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
     
-COPY --from=build /app/server .
+COPY --from=builder /app/server .
 
 EXPOSE 8080
 

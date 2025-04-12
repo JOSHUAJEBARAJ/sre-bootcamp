@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -88,8 +89,11 @@ func main() {
 	router.PUT("/api/v1/students/:id", handler.PutStudent)
 	router.POST("/api/v1/students", handler.AddStudent)
 	router.GET("/healthcheck", handler.Healthcheck)
-
-	addr := ":8080"
+	var port int
+	if os.Getenv("PORT") == "" {
+		port = 8080
+	}
+	addr := fmt.Sprintf(":%d", port)
 	server := &http.Server{
 		Addr:    addr,
 		Handler: router,
